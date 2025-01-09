@@ -1,178 +1,179 @@
-import 'package:audio_waveforms/audio_waveforms.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_audio_waveforms/flutter_audio_waveforms.dart';
 
-class CallScreen extends StatelessWidget {
+class CustomWaveform extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('Voice Message Example'),
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              VoiceMessageWidget(
-                audiopath:
-                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-                isSender: false,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  _CustomWaveformState createState() => _CustomWaveformState();
 }
 
-class VoiceMessageWidget extends StatefulWidget {
-  final String audiopath;
-  final bool isSender;
-
-  VoiceMessageWidget({required this.audiopath, required this.isSender});
-
-  @override
-  _VoiceMessageWidgetState createState() => _VoiceMessageWidgetState();
-}
-
-class _VoiceMessageWidgetState extends State<VoiceMessageWidget> {
+class _CustomWaveformState extends State<CustomWaveform> {
+  late AudioPlayer audioPlayer;
+  Duration audioDuration = Duration.zero;
+  Duration currentPosition = Duration.zero;
   bool isPlaying = false;
-  Duration duration = Duration.zero;
-  Duration position = Duration.zero;
-  AudioPlayer player = AudioPlayer();
-  final PlayerController playerController = PlayerController();
+  bool isAudioLoaded = false;
+
+  // Simulated waveform data (Replace with actual data)
+  List<double> waveform = List.generate(100, (index) => Random().nextDouble());
+
+  double scrollOffset = 0.0; // Store the scroll offset
 
   @override
   void initState() {
     super.initState();
+    audioPlayer = AudioPlayer();
 
-    player.onDurationChanged.listen((d) {
+    // Play the audio file from the network URL using UrlSource
+    audioPlayer.play(UrlSource("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")).then((_) {
       setState(() {
-        duration = d;
+        isAudioLoaded = true;
+      });
+    }).catchError((error) {
+      print("Error loading audio: $error");
+    });
+
+    // Get audio duration
+    audioPlayer.onDurationChanged.listen((duration) {
+      setState(() {
+        audioDuration = duration;
       });
     });
 
-    player.onPositionChanged.listen((p) {
+    // Track audio position
+    audioPlayer.onPositionChanged.listen((position) {
       setState(() {
-        position = p;
-        // Sync player position with the waveform position
-       // playerController.seekTo(p.inMilliseconds.toDouble());
-       playerController.seekTo(p.inMilliseconds);
+        currentPosition = position;
       });
     });
 
-    player.onPlayerComplete.listen((event) {
+    // Listen to audio player state changes (to detect pause and stop)
+    audioPlayer.onPlayerStateChanged.listen((state) {
       setState(() {
-        isPlaying = false;
-        position = Duration.zero; // Reset position to start
-        playerController.seekTo(0);
+        isPlaying = state == PlayerState.playing;
       });
     });
   }
 
   @override
   void dispose() {
-    player.dispose();
-    playerController.dispose();
+    // Properly dispose of the audio player
+    audioPlayer.stop();
+    audioPlayer.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-
-   // print("controller ---------------->${playerController}");
-    return Expanded(
-      child: Column(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Custom Waveform"),
+      ),
+      body: Column(
         children: [
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  isPlaying ? Icons.pause : Icons.play_arrow,
-                  color:
-                      widget.isSender ? Color(0xffF3F3F3) : Color(0xff1C6593),
-                ),
-                onPressed: () {
-                  if (isPlaying) {
-                    player.pause();
-                  } else {
-                    _playAudio(widget.audiopath);
-                  }
+          const SizedBox(height: 20),
+
+          // RectangleWaveform widget with scrolling
+          Container(
+            height: 70,
+            width: double.infinity,
+            child: NotificationListener<ScrollUpdateNotification>(
+              onNotification: (scrollNotification) {
+                if (scrollNotification is ScrollUpdateNotification) {
                   setState(() {
-                    isPlaying = !isPlaying;
+                    scrollOffset = scrollNotification.metrics.pixels;
+                    _seekAudioBasedOnScroll();
                   });
-                },
+                }
+                return true;
+              },
+              child: RectangleWaveform(
+                isCentered: true,
+                
+                showActiveWaveform: true,
+                isRoundedRectangle: true,
+                activeBorderColor: Colors.blue,
+                activeColor: Colors.blue,
+                inactiveColor: Colors.grey.withOpacity(0.3),
+                inactiveBorderColor: Colors.grey.withOpacity(0.3),
+                samples: waveform,
+                height: 70,
+                width: waveform.length * 5.0, // Width based on waveform length
+                maxDuration: audioDuration,
+                elapsedDuration: currentPosition,
               ),
-              Expanded(
-                child: AudioFileWaveforms(
-                  backgroundColor: Colors.blue,
-                  animationCurve: Curves.bounceIn,
-                  continuousWaveform: true,
-                  animationDuration: Duration(seconds: 50),
-                  waveformType: WaveformType.long,
-                  margin: EdgeInsets.all(10),
-                  enableSeekGesture: true,
-                  playerWaveStyle: PlayerWaveStyle(
-                    showTop: true,
-                    showSeekLine: true,
-                    fixedWaveColor: Colors.amber,
-                    backgroundColor: Colors.red,
-                  ),
-                  playerController: playerController,
-                  size: Size(300, 100), // Set size for waveform
-                ),
-              ),
-            ],
+            ),
           ),
+
+          const SizedBox(height: 20),
+
+          // Audio Duration display (below the waveform)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _formatDuration(position),
-                  style: TextStyle(
-                    color:
-                        widget.isSender ? Color(0xffF3F3F3) : Color(0xff1C6593),
-                  ),
+                  formatDuration(currentPosition),
+                  style: TextStyle(fontSize: 16),
                 ),
                 Text(
-                  _formatDuration(duration),
-                  style: TextStyle(
-                    color:
-                        widget.isSender ? Color(0xffF3F3F3) : Color(0xff1C6593),
-                  ),
+                  formatDuration(audioDuration),
+                  style: TextStyle(fontSize: 16),
                 ),
               ],
             ),
           ),
+
+          const SizedBox(height: 20),
+
+          // Play button
+          ElevatedButton(
+            onPressed: isAudioLoaded
+                ? () {
+                    if (isPlaying) {
+                      audioPlayer.pause();
+                    } else {
+                      audioPlayer.resume();
+                    }
+                  }
+                : null, // Disable if audio not loaded
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isPlaying ? Colors.red : Colors.blue, // Toggle color
+            ),
+            child: Text(isPlaying ? "Pause" : "Play"),
+          ),
+
+          if (!isAudioLoaded)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text("Loading audio... Please wait."),
+            ),
         ],
       ),
     );
   }
 
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$minutes:$seconds';
+  String formatDuration(Duration duration) {
+    return duration.toString().split('.').first; // Format as HH:mm:ss
   }
 
-  void _playAudio(String path) async {
-    try {
-      if (path.contains('http') || path.contains('www')) {
-        // For online URLs
-        await player.setSourceUrl(path);
-      } else {
-        // For local assets
-        await player.setSourceAsset(path);
-      }
-      await player.resume();
-      playerController.startPlayer();
-    } catch (e) {
-      print("Error playing audio: $e");
+  void _seekAudioBasedOnScroll() {
+    if (audioDuration.inMilliseconds > 0) {
+      // Calculate the scroll progress and map it to audio duration
+      double progress = scrollOffset / (waveform.length * 5.0);
+      Duration newPosition = Duration(milliseconds: (progress * audioDuration.inMilliseconds).toInt());
+      
+      // Ensure new position is within audio bounds
+      newPosition = newPosition.inMilliseconds < 0
+          ? Duration.zero
+          : (newPosition.inMilliseconds > audioDuration.inMilliseconds
+              ? audioDuration
+              : newPosition);
+
+      // Seek to the new position in the audio
+      audioPlayer.seek(newPosition);
     }
   }
 }
