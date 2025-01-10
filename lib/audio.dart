@@ -15,8 +15,8 @@ class _CustomWaveformState extends State<CustomWaveform> {
   bool isPlaying = false;
   bool isAudioLoaded = false;
 
-  // Dynamic waveform data
-  List<double> waveform = [];
+  // Fixed number of waveform samples (100 samples)
+  List<double> waveform = List.generate(100, (index) => Random().nextDouble());
 
   double scrollOffset = 0.0; // Store the scroll offset
 
@@ -25,8 +25,8 @@ class _CustomWaveformState extends State<CustomWaveform> {
     super.initState();
     audioPlayer = AudioPlayer();
 
-    // Play the audio file from the network URL using UrlSource
-    audioPlayer.play(UrlSource("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")).then((_) {
+    // Play the audio file from the assets using AssetSource
+    audioPlayer.play(AssetSource("audio/creepy.mp3")).then((_) {
       setState(() {
         isAudioLoaded = true;
       });
@@ -38,7 +38,6 @@ class _CustomWaveformState extends State<CustomWaveform> {
     audioPlayer.onDurationChanged.listen((duration) {
       setState(() {
         audioDuration = duration;
-        _generateDynamicWaveform(); // Generate waveform after audio duration is available
       });
     });
 
@@ -80,7 +79,7 @@ class _CustomWaveformState extends State<CustomWaveform> {
             onHorizontalDragUpdate: (details) {
               // Adjust scroll offset and direction of audio seeking
               setState(() {
-                scrollOffset += details.primaryDelta!; // Reverse the direction of scroll
+                scrollOffset += details.primaryDelta!;
                 _seekAudioBasedOnScroll();
               });
             },
@@ -102,7 +101,7 @@ class _CustomWaveformState extends State<CustomWaveform> {
                 inactiveBorderColor: Colors.grey.withOpacity(0.3),
                 samples: waveform,
                 height: 30,
-                width: waveform.length * 3.0, // Width based on waveform length
+                width: 100 * 3.0, // Width based on 100 samples
                 maxDuration: audioDuration,
                 elapsedDuration: currentPosition,
               ),
@@ -163,9 +162,9 @@ class _CustomWaveformState extends State<CustomWaveform> {
   }
 
   void _seekAudioBasedOnScroll() {
-    if (audioDuration.inMilliseconds > 0 && waveform.isNotEmpty) {
+    if (audioDuration.inMilliseconds > 0) {
       // Map the scroll offset to audio duration
-      double progress = (scrollOffset / (waveform.length * 3.0)); // Adjust the scale factor if needed
+      double progress = (scrollOffset / (100 * 3.0)); // 100 samples, adjust the scale factor
       Duration newPosition = Duration(milliseconds: (progress * audioDuration.inMilliseconds).toInt());
 
       // Ensure the new position is within bounds
@@ -181,9 +180,9 @@ class _CustomWaveformState extends State<CustomWaveform> {
   }
 
   void _seekAudioBasedOnTap(double tapPosition) {
-    if (audioDuration.inMilliseconds > 0 && waveform.isNotEmpty) {
+    if (audioDuration.inMilliseconds > 0) {
       // Map the tap position to the audio duration
-      double progress = tapPosition / (waveform.length * 3.0); // Adjust scale if needed
+      double progress = tapPosition / (100 * 3.0); // 100 samples, adjust scale if needed
       Duration newPosition = Duration(milliseconds: (progress * audioDuration.inMilliseconds).toInt());
 
       // Ensure the new position is within bounds
@@ -198,13 +197,10 @@ class _CustomWaveformState extends State<CustomWaveform> {
     }
   }
 
-  // Dynamically generate the waveform based on audio duration
+  // You can adjust the waveform generation based on the audio length
   void _generateDynamicWaveform() {
     if (audioDuration.inMilliseconds > 0) {
-      // Define the number of samples based on the audio duration (e.g., 300 samples for the entire audio)
-      int sampleCount = (audioDuration.inMilliseconds / 80).round(); // 80ms per sample
-
-      // Generate waveform data with random values (replace with real waveform generation logic)
+      int sampleCount = 100; // Fixed sample count
       setState(() {
         waveform = List.generate(sampleCount, (index) => Random().nextDouble());
       });
