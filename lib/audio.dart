@@ -15,8 +15,8 @@ class _CustomWaveformState extends State<CustomWaveform> {
   bool isPlaying = false;
   bool isAudioLoaded = false;
 
-  // Simulated waveform data (Replace with actual data)
-  List<double> waveform = List.generate(100, (index) => Random().nextDouble());
+  // Dynamic waveform data
+  List<double> waveform = [];
 
   double scrollOffset = 0.0; // Store the scroll offset
 
@@ -38,6 +38,7 @@ class _CustomWaveformState extends State<CustomWaveform> {
     audioPlayer.onDurationChanged.listen((duration) {
       setState(() {
         audioDuration = duration;
+        _generateDynamicWaveform(); // Generate waveform after audio duration is available
       });
     });
 
@@ -74,23 +75,25 @@ class _CustomWaveformState extends State<CustomWaveform> {
         children: [
           const SizedBox(height: 20),
 
-          // RectangleWaveform widget with scrolling
-          Container(
-            height: 70,
-            width: double.infinity,
-            child: NotificationListener<ScrollUpdateNotification>(
-              onNotification: (scrollNotification) {
-                if (scrollNotification is ScrollUpdateNotification) {
-                  setState(() {
-                    scrollOffset = scrollNotification.metrics.pixels;
-                    _seekAudioBasedOnScroll();
-                  });
-                }
-                return true;
-              },
+          // GestureDetector to handle tap and scrolling
+          GestureDetector(
+            onHorizontalDragUpdate: (details) {
+              // Adjust scroll offset and direction of audio seeking
+              setState(() {
+                scrollOffset += details.primaryDelta!; // Reverse the direction of scroll
+                _seekAudioBasedOnScroll();
+              });
+            },
+            onTapDown: (details) {
+              // Calculate the position where the user tapped
+              double tapPosition = details.localPosition.dx;
+              _seekAudioBasedOnTap(tapPosition);
+            },
+            child: Container(
+              height: 30,
+              width: double.infinity,
               child: RectangleWaveform(
                 isCentered: true,
-                
                 showActiveWaveform: true,
                 isRoundedRectangle: true,
                 activeBorderColor: Colors.blue,
@@ -98,8 +101,8 @@ class _CustomWaveformState extends State<CustomWaveform> {
                 inactiveColor: Colors.grey.withOpacity(0.3),
                 inactiveBorderColor: Colors.grey.withOpacity(0.3),
                 samples: waveform,
-                height: 70,
-                width: waveform.length * 5.0, // Width based on waveform length
+                height: 30,
+                width: waveform.length * 3.0, // Width based on waveform length
                 maxDuration: audioDuration,
                 elapsedDuration: currentPosition,
               ),
@@ -160,20 +163,51 @@ class _CustomWaveformState extends State<CustomWaveform> {
   }
 
   void _seekAudioBasedOnScroll() {
-    if (audioDuration.inMilliseconds > 0) {
-      // Calculate the scroll progress and map it to audio duration
-      double progress = scrollOffset / (waveform.length * 5.0);
+    if (audioDuration.inMilliseconds > 0 && waveform.isNotEmpty) {
+      // Map the scroll offset to audio duration
+      double progress = (scrollOffset / (waveform.length * 3.0)); // Adjust the scale factor if needed
       Duration newPosition = Duration(milliseconds: (progress * audioDuration.inMilliseconds).toInt());
-      
-      // Ensure new position is within audio bounds
+
+      // Ensure the new position is within bounds
       newPosition = newPosition.inMilliseconds < 0
           ? Duration.zero
           : (newPosition.inMilliseconds > audioDuration.inMilliseconds
               ? audioDuration
               : newPosition);
 
-      // Seek to the new position in the audio
+      // Seek to the new position
       audioPlayer.seek(newPosition);
+    }
+  }
+
+  void _seekAudioBasedOnTap(double tapPosition) {
+    if (audioDuration.inMilliseconds > 0 && waveform.isNotEmpty) {
+      // Map the tap position to the audio duration
+      double progress = tapPosition / (waveform.length * 3.0); // Adjust scale if needed
+      Duration newPosition = Duration(milliseconds: (progress * audioDuration.inMilliseconds).toInt());
+
+      // Ensure the new position is within bounds
+      newPosition = newPosition.inMilliseconds < 0
+          ? Duration.zero
+          : (newPosition.inMilliseconds > audioDuration.inMilliseconds
+              ? audioDuration
+              : newPosition);
+
+      // Seek to the new position
+      audioPlayer.seek(newPosition);
+    }
+  }
+
+  // Dynamically generate the waveform based on audio duration
+  void _generateDynamicWaveform() {
+    if (audioDuration.inMilliseconds > 0) {
+      // Define the number of samples based on the audio duration (e.g., 300 samples for the entire audio)
+      int sampleCount = (audioDuration.inMilliseconds / 80).round(); // 80ms per sample
+
+      // Generate waveform data with random values (replace with real waveform generation logic)
+      setState(() {
+        waveform = List.generate(sampleCount, (index) => Random().nextDouble());
+      });
     }
   }
 }
